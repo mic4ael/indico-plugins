@@ -35,6 +35,7 @@ class EntryType(int, IndicoEnum):
     contribution = 3
     subcontribution = 4
     session = 5
+    note = 6
 
 
 _column_for_types = {
@@ -42,7 +43,8 @@ _column_for_types = {
     EntryType.event: 'event_id',
     EntryType.contribution: 'contribution_id',
     EntryType.subcontribution: 'subcontribution_id',
-    EntryType.session: 'session_id'
+    EntryType.session: 'session_id',
+    EntryType.note: 'note_id'
 }
 
 
@@ -144,6 +146,15 @@ class LiveSyncQueueEntry(db.Model):
         nullable=True
     )
 
+    #: ID of the changed note
+    note_id = db.Column(
+        'note_id',
+        db.Integer,
+        db.ForeignKey('events.notes.id'),
+        index=True,
+        nullable=True
+    )
+
     #: The associated :class:LiveSyncAgent
     agent = db.relationship(
         'LiveSyncAgent',
@@ -200,6 +211,16 @@ class LiveSyncQueueEntry(db.Model):
         )
     )
 
+    note = db.relationship(
+        'EventNote',
+        lazy=False,
+        backref=db.backref(
+            'livesync_queue_entries',
+            cascade='all, delete-orphan',
+            lazy='dynamic'
+        )
+    )
+
     @property
     def object(self):
         """Return the changed object."""
@@ -213,17 +234,21 @@ class LiveSyncQueueEntry(db.Model):
             return self.contribution
         elif self.type == EntryType.subcontribution:
             return self.subcontribution
+        elif self.type == EntryType.note:
+            return self.note
 
     @property
     def object_ref(self):
         """Return the reference of the changed object."""
         return ImmutableDict(type=self.type, category_id=self.category_id, event_id=self.event_id,
-                             session_id=self.session_id, contrib_id=self.contrib_id, subcontrib_id=self.subcontrib_id)
+                             session_id=self.session_id, contrib_id=self.contrib_id, subcontrib_id=self.subcontrib_id,
+                             note_id=self.note_id)
 
     @return_ascii
     def __repr__(self):
         return format_repr(self, 'id', 'agent_id', 'change', 'type',
-                           category_id=None, event_id=None, session_id=None, contrib_id=None, subcontrib_id=None)
+                           category_id=None, event_id=None, session_id=None, contrib_id=None, subcontrib_id=None,
+                           note_id=None)
 
     @classmethod
     def create(cls, changes, ref, excluded_categories=set()):
